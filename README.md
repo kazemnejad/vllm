@@ -14,7 +14,88 @@ Easy, fast, and cheap LLM serving for everyone
 
 </p>
 
+# vLLM + `logit_bias`
+
+## How to install the forked version
+
+This fork adds support for `logit_bias` used in OpenAI apis.
+
+```bash
+conda create -n myenv python=3.8 -y
+conda activate myenv
+
+# Install vLLM.
+pip install git+https://github.com/kazemnejad/vllm.git # This may take 5-10 minutes.
+```
+
+Examples of usage:
+
+1. No bias
+```bash
+curl http://localhost:8000/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "meta-llama/Llama-2-7b-chat-hf",
+        "prompt": "San Francisco is a",
+        "max_tokens": 7,
+        "temperature": 0
+    }'
+```
+Outputs: `city in Northern California that is known`
+
+
+2. Prevent "city"
+```bash
+curl http://localhost:8000/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "meta-llama/Llama-2-7b-chat-hf",
+        "prompt": "San Francisco is a",
+        "max_tokens": 7,
+        "temperature": 0,
+        "logit_bias": {
+            "4272": -100
+        }
+    }'
+```
+Outputs: `popular tourist destination, known for`
+
+3. Prevent "city" and "destination"
+```bash
+curl http://localhost:8000/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "meta-llama/Llama-2-7b-chat-hf",
+        "prompt": "San Francisco is a",
+        "max_tokens": 7,
+        "temperature": 0,
+        "logit_bias": {
+            "4272": -100,
+            "12551": -100
+        }
+    }'
+```
+Outputs: `popular tourist attraction, known`
+
+4. Always generate "city"
+```bash
+curl http://localhost:8000/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "meta-llama/Llama-2-7b-chat-hf",
+        "prompt": "San Francisco is a",
+        "max_tokens": 7,
+        "temperature": 0,
+        "logit_bias": {
+            "4272": 100
+        }
+    }'
+```
+Outputs: `city city city city city city city`
+
 ---
+
+
 
 *Latest News* 🔥
 - [2023/07] Added support for LLaMA-2! You can run and serve 7B/13B/70B LLaMA-2s on vLLM with a single command!

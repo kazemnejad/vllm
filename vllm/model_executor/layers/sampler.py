@@ -61,6 +61,13 @@ class Sampler(nn.Module):
         logits = _apply_penalties(logits, output_tokens, presence_penalties,
                                   frequency_penalties, self.vocab_size)
 
+        # Apply user defined logit bias. If not specified, 
+        # this is adds 0 to the corresponding logits.
+        logits_bias = _get_logit_biases(
+            input_metadata, self.vocab_size, dtype=logits.dtype)
+        logits_bias = logits_bias.to(logits.device)
+        logits += logits_bias
+
         # Apply temperature scaling.
         temperatures = _get_temperatures(input_metadata)
         assert len(temperatures) == logits.shape[0]
@@ -232,6 +239,46 @@ def _get_top_p_top_k(
             top_ps += [top_p] * len(seq_ids)
             top_ks += [top_k] * len(seq_ids)
     return top_ps, top_ks
+
+
+def _get_logit_biases(
+    input_metadata: InputMetadata,
+    vocab_size: int,
+    dtype=torch.float,
+) -> torch.FloatTensor:
+    logit_biases: List[torch.FloatTensor] = []
+    for i, seq_group in enumerate(input_metadata.seq_groups):
+        seq_ids, sampling_params = seq_group
+        bias = sampling_params.logit_bias
+        bias_tenosr = _construct_logit_bias_tensor(bias, vocab_size, dtype=dtype)
+        if i < input_metadata.num_prompts:
+            # A prompt input.
+            logit_biases.append(bias_tenosr)
+        else:
+            # A generation token.
+            logit_biases += [bias_tenosr] * len(seq_ids)
+    
+    # Construct a [num_seqs, vocab_size] tensor.
+    logit_biases = torch.stack(logit_biases, dim=0)
+    return logit_biases
+
+
+def _construct_logit_bias_tensor(
+    bias_dict: Dict[int, float],
+    vocab_size: int,
+    dtype=torch.float,
+) -> torch.FloatTensor:
+    bias = torch.zeros((vocab_size,), dtype=dtype)
+    if bias_dict is None:
+        return bias
+    
+    for token_id, token_bias in bias_dict.items():
+        if token_id >= vocab_size:
+
+            continue
+        bias[token_id] = token_bias
+    
+    return bias
 
 
 def _apply_top_p_top_k(

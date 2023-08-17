@@ -142,6 +142,36 @@ async def check_length(
         return input_ids, None
 
 
+async def check_logit_bias(
+    request: Union[ChatCompletionRequest, CompletionRequest],
+) -> Tuple[Dict[int, float], Optional[JSONResponse]]:
+    if not isinstance(request.logit_bias, dict):
+        return create_error_response(HTTPStatus.BAD_REQUEST,
+                                        "logit_bias must be a dict (JSON)")
+    logit_bias = {}
+    for key, value in request.logit_bias.items():
+        if not isinstance(key, int):
+            if not key.isdigit():
+                return None, create_error_response(
+                    HTTPStatus.BAD_REQUEST,
+                    "logit_bias keys must be integers")
+            key = int(key)
+        
+        if key < 0:
+            return None, create_error_response(
+                HTTPStatus.BAD_REQUEST,
+                "logit_bias keys must be non-negative")
+
+        if not isinstance(value, (int, float)):
+            return None, create_error_response(
+                HTTPStatus.BAD_REQUEST,
+                "logit_bias values must be integers or floats")
+        
+        logit_bias[key] = float(value)
+    
+    return logit_bias, None
+
+
 @app.get("/v1/models")
 async def show_available_models():
     """Show available models. Right now we only have one model."""
@@ -186,7 +216,6 @@ async def create_chat_completion(raw_request: Request):
 
     NOTE: Currently we do not support the following features:
         - function_call (Users should implement this by themselves)
-        - logit_bias (to be supported by vLLM engine)
     """
     request = ChatCompletionRequest(**await raw_request.json())
     logger.info(f"Received chat completion request: {request}")
@@ -196,9 +225,11 @@ async def create_chat_completion(raw_request: Request):
         return error_check_ret
 
     if request.logit_bias is not None:
-        # TODO: support logit_bias in vLLM engine.
-        return create_error_response(HTTPStatus.BAD_REQUEST,
-                                     "logit_bias is not currently supported")
+        logit_bias, err = await check_logit_bias(request)
+        if err is not None:
+            return err
+    else:
+        logit_bias = None
 
     prompt = await get_gen_prompt(request)
     token_ids, error_check_ret = await check_length(request, prompt=prompt)
@@ -221,6 +252,7 @@ async def create_chat_completion(raw_request: Request):
             top_k=request.top_k,
             ignore_eos=request.ignore_eos,
             use_beam_search=request.use_beam_search,
+            logit_bias=logit_bias,
         )
     except ValueError as e:
         return create_error_response(HTTPStatus.BAD_REQUEST, str(e))
@@ -359,7 +391,6 @@ async def create_completion(raw_request: Request):
           getting the logprobs of prompt tokens)
         - suffix (the language models we currently support do not support
           suffix)
-        - logit_bias (to be supported by vLLM engine)
     """
     request = CompletionRequest(**await raw_request.json())
     logger.info(f"Received completion request: {request}")
@@ -380,9 +411,11 @@ async def create_completion(raw_request: Request):
                                      "suffix is not currently supported")
 
     if request.logit_bias is not None:
-        # TODO: support logit_bias in vLLM engine.
-        return create_error_response(HTTPStatus.BAD_REQUEST,
-                                     "logit_bias is not currently supported")
+        logit_bias, err = await check_logit_bias(request)
+        if err is not None:
+            return err
+    else:
+        logit_bias = None
 
     model_name = request.model
     request_id = f"cmpl-{random_uuid()}"
@@ -429,6 +462,7 @@ async def create_completion(raw_request: Request):
             max_tokens=request.max_tokens,
             logprobs=request.logprobs,
             use_beam_search=request.use_beam_search,
+            logit_bias=logit_bias,
         )
     except ValueError as e:
         return create_error_response(HTTPStatus.BAD_REQUEST, str(e))

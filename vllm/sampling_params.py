@@ -1,5 +1,5 @@
 """Sampling parameters for text generation."""
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 _SAMPLING_EPS = 1e-5
 
@@ -56,6 +56,7 @@ class SamplingParams:
         ignore_eos: bool = False,
         max_tokens: int = 16,
         logprobs: Optional[int] = None,
+        logit_bias: Optional[Dict[int, float]] = None,
     ) -> None:
         self.n = n
         self.best_of = best_of if best_of is not None else n
@@ -74,6 +75,7 @@ class SamplingParams:
         self.ignore_eos = ignore_eos
         self.max_tokens = max_tokens
         self.logprobs = logprobs
+        self.logit_bias = logit_bias
 
         self._verify_args()
         if self.use_beam_search:
