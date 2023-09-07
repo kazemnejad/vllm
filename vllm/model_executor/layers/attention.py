@@ -61,7 +61,6 @@ class PagedAttention(nn.Module):
         self.num_heads = num_heads
         self.head_size = head_size
         self.scale = float(scale)
-        self.attn_op = xops.fmha.cutlass.FwOp()
         self.num_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
 
         assert self.num_heads % self.num_kv_heads == 0
@@ -115,7 +114,6 @@ class PagedAttention(nn.Module):
             attn_bias=input_metadata.attn_bias[0],
             p=0.0,
             scale=self.scale,
-            op=self.attn_op,
         )
         # TODO(woosuk): Unnecessary copy. Optimize.
         output.copy_(out.squeeze(0))
@@ -244,7 +242,7 @@ class PagedAttention(nn.Module):
 
 
 class PagedAttentionWithRoPE(PagedAttention):
-    """PagedAttention with GPT-NeoX style rotary embedding."""
+    """PagedAttention with rotary embedding."""
 
     def __init__(
         self,
@@ -255,8 +253,10 @@ class PagedAttentionWithRoPE(PagedAttention):
         max_position: int = 8192,
         base: int = 10000,
         num_kv_heads: Optional[int] = None,
+        is_neox_style: bool = True,
     ) -> None:
         super().__init__(num_heads, head_size, scale, num_kv_heads)
+        self.is_neox_style = is_neox_style
 
         # Create the cos and sin cache.
         inv_freq = 1.0 / (base**(torch.arange(0, rotary_dim, 2) / rotary_dim))
@@ -305,12 +305,13 @@ class PagedAttentionWithRoPE(PagedAttention):
 
         # Apply rotary embedding to the query and key before passing them
         # to the attention op.
-        pos_encoding_ops.rotary_embedding_neox(
+        pos_encoding_ops.rotary_embedding(
             positions,
             query,
             key,
             self.head_size,
             self.cos_sin_cache,
+            self.is_neox_style,
         )
         return super().forward(
             query,
@@ -357,11 +358,12 @@ class PagedAttentionWithALiBi(PagedAttention):
             # be sliced from a tensor whose length is a multiple of 8.
             padded_len = (prompt_len + 7) // 8 * 8
             bias = torch.empty(
+                1,  # batch_size
                 self.num_heads,
-                padded_len,
+                prompt_len,
                 padded_len,
                 device=self.alibi_slopes.device,
-            )[:, :prompt_len, :prompt_len].copy_(bias)
+            )[:, :, :, :prompt_len].copy_(bias)
             bias.mul_(self.alibi_slopes[:, None, None])
             attn_bias = LowerTriangularMaskWithTensorBias(bias)
             input_metadata.attn_bias.append(attn_bias)
@@ -403,7 +405,6 @@ class PagedAttentionWithALiBi(PagedAttention):
                 attn_bias=input_metadata.attn_bias[i],
                 p=0.0,
                 scale=self.scale,
-                op=self.attn_op,
             )
             # TODO(woosuk): Unnecessary copy. Optimize.
             output[start:end].copy_(out.squeeze(0))
