@@ -189,6 +189,9 @@ class AsyncLLMEngine:
         # Put the outputs into the corresponding streams.
         for request_output in request_outputs:
             request_id = request_output.request_id
+            if request_id not in self.request_streams:
+                logger.warning(f"Request {request_id} not found. Skipping.")
+                continue
             self.request_streams[request_id].put(request_output)
             if request_output.finished:
                 if self.log_requests:
