@@ -143,4 +143,5 @@ class SamplingParams:
                 f"stop={self.stop}, "
                 f"ignore_eos={self.ignore_eos}, "
                 f"max_tokens={self.max_tokens}, "
-                f"logprobs={self.logprobs})")
+                f"logprobs={self.logprobs}), "
+                f"logit_bias={self.logit_bias if self.logit_bias is not None else dict()})")
