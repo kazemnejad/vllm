@@ -20,9 +20,9 @@ ABI = 1 if torch._C._GLIBCXX_USE_CXX11_ABI else 0
 CXX_FLAGS += [f"-D_GLIBCXX_USE_CXX11_ABI={ABI}"]
 NVCC_FLAGS += [f"-D_GLIBCXX_USE_CXX11_ABI={ABI}"]
 
-if CUDA_HOME is None:
-    raise RuntimeError(
-        f"Cannot find CUDA_HOME. CUDA must be available to build the package.")
+#if CUDA_HOME is None:
+#    raise RuntimeError(
+#        f"Cannot find CUDA_HOME. CUDA must be available to build the package.")
 
 
 def get_nvcc_cuda_version(cuda_dir: str) -> Version:
@@ -30,7 +30,7 @@ def get_nvcc_cuda_version(cuda_dir: str) -> Version:
 
     Adapted from https://github.com/NVIDIA/apex/blob/8b7a1ff183741dd8f9b87e7bafd04cfde99cea28/setup.py
     """
-    nvcc_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
+    nvcc_output = subprocess.check_output(["nvcc", "-V"],
                                           universal_newlines=True)
     output = nvcc_output.split()
     release_idx = output.index("release") + 1
