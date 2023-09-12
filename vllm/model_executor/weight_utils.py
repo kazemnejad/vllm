@@ -93,7 +93,8 @@ def prepare_hf_model_weights(
         with get_lock(model_name_or_path, cache_dir):
             hf_folder_cache_file = os.environ.get(
                 "VLLM_HF_FOLDER_CACHE_FILE", None)
-            if hf_folder_cache_file is not None:
+            if hf_folder_cache_file is not None and os.path.exists(
+                    hf_folder_cache_file):
                 with open(hf_folder_cache_file, "r") as f:
                     hf_folder_cache = json.load(f)
                 logger.info(f"Loaded hf_folder_cache from {hf_folder_cache_file}")
