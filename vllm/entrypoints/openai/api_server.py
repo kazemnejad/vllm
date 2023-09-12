@@ -39,7 +39,7 @@ try:
 except ImportError:
     _fastchat_available = False
 
-TIMEOUT_KEEP_ALIVE = 5  # seconds
+TIMEOUT_KEEP_ALIVE = 10000  # seconds
 
 logger = init_logger(__name__)
 served_model = None
