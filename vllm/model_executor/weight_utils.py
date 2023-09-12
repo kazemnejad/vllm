@@ -113,7 +113,7 @@ def prepare_hf_model_weights(
                                               tqdm_class=Disabledtqdm)
                 hf_folder_cache[model_name_or_path] = hf_folder
                 if hf_folder_cache_file is not None:
-                    with hf_folder_cache_file, "w" as f:
+                    with open(hf_folder_cache_file, "w") as f:
                         json.dump(hf_folder_cache, f)
     else:
         hf_folder = model_name_or_path
