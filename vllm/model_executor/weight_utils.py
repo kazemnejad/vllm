@@ -91,10 +91,29 @@ def prepare_hf_model_weights(
         # Use file lock to prevent multiple processes from
         # downloading the same model weights at the same time.
         with get_lock(model_name_or_path, cache_dir):
-            hf_folder = snapshot_download(model_name_or_path,
-                                          allow_patterns=allow_patterns,
-                                          cache_dir=cache_dir,
-                                          tqdm_class=Disabledtqdm)
+            hf_folder_cache_file = os.environ.get(
+                "VLLM_HF_FOLDER_CACHE_FILE", None)
+            if hf_folder_cache_file is not None:
+                with open(hf_folder_cache_file, "r") as f:
+                    hf_folder_cache = json.load(f)
+                logger.info(f"Loaded hf_folder_cache from {hf_folder_cache_file}")
+            else:
+                hf_folder_cache = {}
+
+            if model_name_or_path in hf_folder_cache:
+                logger.info(
+                    f"Found cached model weights for {model_name_or_path} in {hf_folder_cache[model_name_or_path]}"
+                )
+                hf_folder = hf_folder_cache[model_name_or_path]
+            else:
+                hf_folder = snapshot_download(model_name_or_path,
+                                              allow_patterns=allow_patterns,
+                                              cache_dir=cache_dir,
+                                              tqdm_class=Disabledtqdm)
+                hf_folder_cache[model_name_or_path] = hf_folder
+                if hf_folder_cache_file is not None:
+                    with hf_folder_cache_file, "w" as f:
+                        json.dump(hf_folder_cache, f)
     else:
         hf_folder = model_name_or_path
     hf_weights_files = glob.glob(os.path.join(hf_folder, allow_patterns))
