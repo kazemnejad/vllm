@@ -149,26 +149,48 @@ def prepare_hf_model_weights(
         allow_patterns += ["*.pt"]
 
     if not is_local:
-        # Before we download we look at that is available:
-        fs = HfFileSystem()
-        file_list = fs.ls(model_name_or_path, detail=False, revision=revision)
-
-        # depending on what is available we download different things
-        for pattern in allow_patterns:
-            matching = fnmatch.filter(file_list, pattern)
-            if len(matching) > 0:
-                allow_patterns = [pattern]
-                break
-
-        logger.info(f"Using model weights format {allow_patterns}")
         # Use file lock to prevent multiple processes from
         # downloading the same model weights at the same time.
         with get_lock(model_name_or_path, cache_dir):
-            hf_folder = snapshot_download(model_name_or_path,
-                                          allow_patterns=allow_patterns,
-                                          cache_dir=cache_dir,
-                                          tqdm_class=Disabledtqdm,
-                                          revision=revision)
+            hf_folder_cache_file = os.environ.get(
+                "VLLM_HF_FOLDER_CACHE_FILE", None)
+            if hf_folder_cache_file is not None and os.path.exists(
+                    hf_folder_cache_file):
+                with open(hf_folder_cache_file, "r") as f:
+                    hf_folder_cache = json.load(f)
+                logger.info(f"Loaded hf_folder_cache from {hf_folder_cache_file}")
+            else:
+                hf_folder_cache = {}
+
+            if model_name_or_path in hf_folder_cache:
+                logger.info(
+                    f"Found cached model weights for {model_name_or_path} in {hf_folder_cache[model_name_or_path]}"
+                )
+                hf_folder = hf_folder_cache[model_name_or_path]
+                allow_patterns = hf_folder_cache[f"ALLOW_PATTERNS__{model_name_or_path}"]
+            else:
+                # Before we download we look at that is available:
+                fs = HfFileSystem()
+                file_list = fs.ls(model_name_or_path, detail=False, revision=revision)
+
+                # depending on what is available we download different things
+                for pattern in allow_patterns:
+                    matching = fnmatch.filter(file_list, pattern)
+                    if len(matching) > 0:
+                        allow_patterns = [pattern]
+                        break
+
+                logger.info(f"Using model weights format {allow_patterns}")
+                hf_folder = snapshot_download(model_name_or_path,
+                                            allow_patterns=allow_patterns,
+                                            cache_dir=cache_dir,
+                                            tqdm_class=Disabledtqdm,
+                                            revision=revision)
+                hf_folder_cache[model_name_or_path] = hf_folder
+                hf_folder_cache[f"ALLOW_PATTERNS__{model_name_or_path}"] = allow_patterns
+                if hf_folder_cache_file is not None:
+                    with open(hf_folder_cache_file, "w") as f:
+                        json.dump(hf_folder_cache, f)
     else:
         hf_folder = model_name_or_path
     hf_weights_files: List[str] = []
