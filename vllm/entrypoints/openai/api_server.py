@@ -25,7 +25,7 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_completion import OpenAIServingCompletion
 from vllm.entrypoints.openai.serving_engine import LoRA
 
-TIMEOUT_KEEP_ALIVE = 5  # seconds
+TIMEOUT_KEEP_ALIVE = 10000  # seconds
 
 openai_serving_chat: OpenAIServingChat = None
 openai_serving_completion: OpenAIServingCompletion = None

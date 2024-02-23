@@ -17,7 +17,7 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 from vllm.sampling_params import SamplingParams
 from vllm.utils import random_uuid
 
-TIMEOUT_KEEP_ALIVE = 5  # seconds.
+TIMEOUT_KEEP_ALIVE = 10000  # seconds.
 app = FastAPI()
 engine = None
 
