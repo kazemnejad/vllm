@@ -1,3 +1,4 @@
+cmake>=3.21
 ninja  # For faster builds.
 typing-extensions>=4.8.0
 starlette
@@ -10,4 +11,5 @@ transformers >= 4.38.0  # Required for Gemma.
 fastapi
 uvicorn[standard]
 pydantic >= 2.0  # Required for OpenAI server.
-aioprometheus[starlette]
+prometheus_client >= 0.18.0
+outlines == 0.0.34
